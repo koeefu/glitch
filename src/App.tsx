@@ -402,6 +402,7 @@ const GlitchSynthesizer = () => {
         .btn:hover { border-color: var(--accent); background: rgba(255,255,255,0.05); }
         .btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
         .btn-icon { width: 14px; height: 14px; }
+        
         .btn.recording {
           background: white !important;
           color: black !important;
@@ -512,15 +513,15 @@ const GlitchSynthesizer = () => {
           </div>
 
           <div className="btn-group">
-           <button
+        
+
+            <button
               className={`btn ${isRecording ? "recording" : ""}`}
-              onClick={() => {
-                if (isRecording) stopRecording();
-                else startRecording();
-              }}
+              onClick={isRecording ? stopRecording : startRecording}
             >
               {isRecording ? "Recording..." : "Record"}
             </button>
+
 
             <button className="btn" onClick={stopRecording}>Stop & Download</button>
           </div>
