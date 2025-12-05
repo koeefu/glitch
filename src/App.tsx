@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import {  Play, Pause, RotateCcw } from 'lucide-react';
+import { Play, Pause, RotateCcw } from 'lucide-react';
 
 const GlitchSynthesizer = () => {
   // --- STATE ---
@@ -7,7 +7,6 @@ const GlitchSynthesizer = () => {
   const [videoSrc, setVideoSrc] = useState('');
   const [isRecording, setIsRecording] = useState(false);
 
-  
   // Effect Parameters
   const [params, setParams] = useState({
     threshold: 200,      // Contrast level (0-255)
@@ -19,6 +18,7 @@ const GlitchSynthesizer = () => {
     invertChance: 0.1,   // Color inversion chance
     scale: 1.0,          // Base scale
     zoomGlitch: 0.1,     // Random zoom
+    isColor: false,      // <-- NEW: Toggle for Color/B&W
   });
 
   // --- REFS ---
@@ -32,11 +32,9 @@ const GlitchSynthesizer = () => {
 
   // record video
   const startRecording = () => {
-    setIsRecording(true);   // ← NEW
-
+    setIsRecording(true);
     const canvas = canvasRef.current;
     const stream = canvas.captureStream(30);
-  
 
     const recorder = new MediaRecorder(stream, {
       mimeType: "video/webm; codecs=vp9"
@@ -49,8 +47,7 @@ const GlitchSynthesizer = () => {
     };
 
     recorder.onstop = () => {
-      setIsRecording(false);   // ← NEW
-
+      setIsRecording(false);
       const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -68,8 +65,6 @@ const GlitchSynthesizer = () => {
       recorderRef.current.stop();
     }
   };
-
-
 
   // --- HANDLERS ---
 
@@ -104,6 +99,7 @@ const GlitchSynthesizer = () => {
       invertChance: 0.1,
       scale: 1.0,
       zoomGlitch: 0.1,
+      isColor: false, // Reset to B&W
     });
   };
 
@@ -147,9 +143,13 @@ const GlitchSynthesizer = () => {
       return;
     }
 
+    // Determine Grayscale Level based on Toggle
+    const grayLevel = params.isColor ? 0 : 100;
+
     // 2. Base Video Draw
     ctx.save();
-    ctx.filter = `contrast(${params.threshold}%) brightness(${params.brightness}%) grayscale(100%)`;
+    // Dynamic grayscale injection
+    ctx.filter = `contrast(${params.threshold}%) brightness(${params.brightness}%) grayscale(${grayLevel}%)`;
     
     const vw = video.videoWidth;
     const vh = video.videoHeight;
@@ -172,10 +172,11 @@ const GlitchSynthesizer = () => {
         
         // Random Color Inversion
         if (Math.random() < params.invertChance) {
-          ctx.filter = `invert(100%) contrast(${params.threshold}%) grayscale(100%)`;
+          // Dynamic grayscale injection here too
+          ctx.filter = `invert(100%) contrast(${params.threshold}%) grayscale(${grayLevel}%)`;
           ctx.globalCompositeOperation = 'difference';
         } else {
-          ctx.filter = `contrast(${params.threshold}%) brightness(${params.brightness}%) grayscale(100%)`;
+          ctx.filter = `contrast(${params.threshold}%) brightness(${params.brightness}%) grayscale(${grayLevel}%)`;
           ctx.globalCompositeOperation = 'source-over';
         }
 
@@ -260,7 +261,6 @@ const GlitchSynthesizer = () => {
             --font-stack: 'Space Mono', monospace;
         }
 
-        
         .glitch-wrapper {
             display: flex;
             width: 100vw;
@@ -514,23 +514,37 @@ const GlitchSynthesizer = () => {
           </div>
 
           <div className="btn-group">
-        
-
             <button
               className={`btn ${isRecording ? "recording" : ""}`}
               onClick={isRecording ? stopRecording : startRecording}
             >
               {isRecording ? "Recording..." : "Record"}
             </button>
-
-
             <button className="btn" onClick={stopRecording}>Stop & Download</button>
           </div>
 
 
           <div className="section-title">Signal Processing</div>
 
-          <Slider label="Threshold" value={params.threshold} min={0} max={500} step={10} onChange={v => setParams(p => ({ ...p, threshold: v }))} desc="B&W cutoff point" />
+          {/* NEW COLOR TOGGLE */}
+          <div className="control-group" style={{ borderColor: 'transparent', paddingLeft: 0, borderLeft: 0 }}>
+             <div className="btn-group" style={{ marginBottom: '0.5rem' }}>
+                <button 
+                    className={`btn ${!params.isColor ? 'active' : ''}`}
+                    onClick={() => setParams(p => ({ ...p, isColor: false }))}
+                >
+                    B&W
+                </button>
+                <button 
+                    className={`btn ${params.isColor ? 'active' : ''}`}
+                    onClick={() => setParams(p => ({ ...p, isColor: true }))}
+                >
+                    COLOR
+                </button>
+             </div>
+          </div>
+
+          <Slider label="Threshold" value={params.threshold} min={0} max={500} step={10} onChange={v => setParams(p => ({ ...p, threshold: v }))} desc="Contrast cutoff" />
 
           <Slider label="Gain (Brightness)" value={params.brightness} min={0} max={300} step={10} onChange={v => setParams(p => ({ ...p, brightness: v }))} desc=""/>
 
