@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Upload, Play, Pause, RotateCcw } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import {  Play, Pause, RotateCcw } from 'lucide-react';
 
 const GlitchSynthesizer = () => {
   // --- STATE ---
@@ -36,6 +36,7 @@ const GlitchSynthesizer = () => {
 
     const canvas = canvasRef.current;
     const stream = canvas.captureStream(30);
+  
 
     const recorder = new MediaRecorder(stream, {
       mimeType: "video/webm; codecs=vp9"
@@ -528,19 +529,26 @@ const GlitchSynthesizer = () => {
 
 
           <div className="section-title">Signal Processing</div>
+
           <Slider label="Threshold" value={params.threshold} min={0} max={500} step={10} onChange={v => setParams(p => ({ ...p, threshold: v }))} desc="B&W cutoff point" />
-          <Slider label="Gain (Brightness)" value={params.brightness} min={0} max={300} step={10} onChange={v => setParams(p => ({ ...p, brightness: v }))} />
-          <Slider label="Invert Chance" value={params.invertChance} min={0} max={1} step={0.05} onChange={v => setParams(p => ({ ...p, invertChance: v }))} />
+
+          <Slider label="Gain (Brightness)" value={params.brightness} min={0} max={300} step={10} onChange={v => setParams(p => ({ ...p, brightness: v }))} desc=""/>
+
+          <Slider label="Invert Chance" value={params.invertChance} min={0} max={1} step={0.05} onChange={v => setParams(p => ({ ...p, invertChance: v }))} desc=""/>
 
           <div className="section-title">Entropy / Glitch</div>
-          <Slider label="Chaos Prob." value={params.chaos} min={0} max={1} step={0.01} onChange={v => setParams(p => ({ ...p, chaos: v }))} />
+
+          <Slider label="Chaos Prob." value={params.chaos} min={0} max={1} step={0.01} onChange={v => setParams(p => ({ ...p, chaos: v }))} desc=""/>
+
           <Slider label="Slice Count" value={params.slices} min={0} max={50} step={1} onChange={v => setParams(p => ({ ...p, slices: v }))} desc="Height of glitch strips" />
-          <Slider label="Displacement" value={params.displacement} min={0} max={300} step={5} onChange={v => setParams(p => ({ ...p, displacement: v }))} />
-          <Slider label="Zoom Jitter" value={params.zoomGlitch} min={0} max={2} step={0.1} onChange={v => setParams(p => ({ ...p, zoomGlitch: v }))} />
+
+          <Slider label="Displacement" value={params.displacement} min={0} max={300} step={5} onChange={v => setParams(p => ({ ...p, displacement: v }))} desc=""/>
+
+          <Slider label="Zoom Jitter" value={params.zoomGlitch} min={0} max={2} step={0.1} onChange={v => setParams(p => ({ ...p, zoomGlitch: v }))} desc=""/>
 
           <div className="section-title">Temporal Feedback</div>
           <Slider label="Ghosting" value={params.feedback} min={0.01} max={0.99} step={0.01} onChange={v => setParams(p => ({ ...p, feedback: v }))} desc="Trail retention" />
-          <Slider label="Global Scale" value={params.scale} min={0.5} max={3} step={0.1} onChange={v => setParams(p => ({ ...p, scale: v }))} />
+          <Slider label="Global Scale" value={params.scale} min={0.5} max={3} step={0.1} onChange={v => setParams(p => ({ ...p, scale: v }))} desc=""/>
 
         </div>
       </aside>
