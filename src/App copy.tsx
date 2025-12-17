@@ -1,10 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 
-// --- CONSTANTS ---
-const RENDER_WIDTH = 3840;  // 4K Width
-const RENDER_HEIGHT = 2160; // 4K Height
-
 const GlitchSynthesizer = () => {
   // --- STATE ---
   const [isPlaying, setIsPlaying] = useState(false);
@@ -22,7 +18,7 @@ const GlitchSynthesizer = () => {
     invertChance: 0.1,   // Color inversion chance
     scale: 1.0,          // Base scale
     zoomGlitch: 0.1,     // Random zoom
-    isColor: false,      // Toggle for Color/B&W
+    isColor: false,      // <-- NEW: Toggle for Color/B&W
   });
 
   // --- REFS ---
@@ -34,18 +30,14 @@ const GlitchSynthesizer = () => {
   const recorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
 
-  // --- RECORD VIDEO (UPDATED FOR HIGH QUALITY) ---
+  // record video
   const startRecording = () => {
     setIsRecording(true);
     const canvas = canvasRef.current;
-    
-    // Capture stream at 30FPS
     const stream = canvas.captureStream(30);
 
     const recorder = new MediaRecorder(stream, {
-      mimeType: "video/webm; codecs=vp9",
-      // CRITICAL: High bitrate for 4K clarity (50 Mbps)
-      videoBitsPerSecond: 50000000 
+      mimeType: "video/webm; codecs=vp9"
     });
 
     recordedChunksRef.current = [];
@@ -60,7 +52,7 @@ const GlitchSynthesizer = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "glitch_effect_4k.webm";
+      a.download = "glitch_effect.webm";
       a.click();
     };
 
@@ -75,6 +67,7 @@ const GlitchSynthesizer = () => {
   };
 
   // --- HANDLERS ---
+
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -106,65 +99,60 @@ const GlitchSynthesizer = () => {
       invertChance: 0.1,
       scale: 1.0,
       zoomGlitch: 0.1,
-      isColor: false,
+      isColor: false, // Reset to B&W
     });
   };
 
-  // --- RENDER LOOP (UPDATED FOR 4K) ---
+  // --- RENDER LOOP ---
   const renderLoop = useCallback(() => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
     
     if (!canvas || !video) return;
     
-    // 1. Force 4K Resolution Buffer
-    if (canvas.width !== RENDER_WIDTH || canvas.height !== RENDER_HEIGHT) {
-      canvas.width = RENDER_WIDTH;
-      canvas.height = RENDER_HEIGHT;
-    }
-
     const ctx = canvas.getContext('2d', { alpha: false });
     
-    // Enable high quality scaling
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
+    // Resize handling
+    if (containerRef.current) {
+      const { clientWidth, clientHeight } = containerRef.current;
+      if (canvas.width !== clientWidth || canvas.height !== clientHeight) {
+        canvas.width = clientWidth;
+        canvas.height = clientHeight;
+      }
+    }
 
     const w = canvas.width;
     const h = canvas.height;
 
-    // 2. Feedback / Trails
+    // 1. Feedback / Trails
     ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = `rgba(0, 0, 0, ${1 - params.feedback})`;
     ctx.fillRect(0, 0, w, h);
 
     if (video.readyState < 2) {
-      // Draw static noise if no video
+      // If no video, draw static noise for "cool factor"
       if (!videoSrc) {
-        // Only draw noise sparingly to save perf on 4K
-        if(Math.random() < 0.5) {
-            const idata = ctx.createImageData(w, h);
-            const buffer32 = new Uint32Array(idata.data.buffer);
-            // Reduced density noise for performance
-            for (let i = 0; i < buffer32.length; i += 4) {
-               if (Math.random() < 0.1) buffer32[i] = 0xff1a1a1a;
-            }
-            ctx.putImageData(idata, 0, 0);
+        const idata = ctx.createImageData(w, h);
+        const buffer32 = new Uint32Array(idata.data.buffer);
+        for (let i = 0; i < buffer32.length; i++) {
+           if (Math.random() < 0.1) buffer32[i] = 0xff1a1a1a;
         }
+        ctx.putImageData(idata, 0, 0);
       }
       animationRef.current = requestAnimationFrame(renderLoop);
       return;
     }
 
+    // Determine Grayscale Level based on Toggle
     const grayLevel = params.isColor ? 0 : 100;
 
-    // 3. Base Video Draw
+    // 2. Base Video Draw
     ctx.save();
+    // Dynamic grayscale injection
     ctx.filter = `contrast(${params.threshold}%) brightness(${params.brightness}%) grayscale(${grayLevel}%)`;
     
     const vw = video.videoWidth;
     const vh = video.videoHeight;
-    
-    // Calculate aspect ratio fit for 4K canvas
     const scale = Math.max(w / vw, h / vh) * params.scale;
     const drawW = vw * scale;
     const drawH = vh * scale;
@@ -175,18 +163,16 @@ const GlitchSynthesizer = () => {
     ctx.drawImage(video, offsetX, offsetY, drawW, drawH);
     ctx.restore();
 
-    // 4. Glitch Slices
+    // 3. Glitch Slices
     const r = (min, max) => Math.random() * (max - min) + min;
-
-    // Scale displacement relative to 4K resolution (so 50px offset feels the same as before)
-    const resMultiplier = 2.5; 
-    const effectiveDisplacement = params.displacement * resMultiplier;
 
     for (let i = 0; i < params.slices; i++) {
       if (Math.random() > (1 - params.chaos)) {
         ctx.save();
         
+        // Random Color Inversion
         if (Math.random() < params.invertChance) {
+          // Dynamic grayscale injection here too
           ctx.filter = `invert(100%) contrast(${params.threshold}%) grayscale(${grayLevel}%)`;
           ctx.globalCompositeOperation = 'difference';
         } else {
@@ -199,8 +185,8 @@ const GlitchSynthesizer = () => {
         const sWidth = Math.random() * (vw / 2);
         const sHeight = Math.random() * (vh / 2);
 
-        const dx = (sx * scale) + offsetX + r(-effectiveDisplacement, effectiveDisplacement);
-        const dy = (sy * scale) + offsetY + r(-effectiveDisplacement, effectiveDisplacement);
+        const dx = (sx * scale) + offsetX + r(-params.displacement, params.displacement);
+        const dy = (sy * scale) + offsetY + r(-params.displacement, params.displacement);
         
         const z = 1 + (Math.random() * params.zoomGlitch);
         const dWidth = (sWidth * scale) * z;
@@ -208,9 +194,10 @@ const GlitchSynthesizer = () => {
 
         ctx.drawImage(video, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
         
+        // Scanlines
         if (Math.random() < 0.3) {
            ctx.strokeStyle = 'rgba(255,255,255,1)';
-           ctx.lineWidth = 4; // Thicker lines for 4K
+           ctx.lineWidth = 2;
            ctx.strokeRect(dx, dy, dWidth, dHeight);
         }
 
@@ -222,6 +209,7 @@ const GlitchSynthesizer = () => {
   }, [params, videoSrc]);
 
   // --- EFFECTS ---
+
   useEffect(() => {
     if (isPlaying) {
       animationRef.current = requestAnimationFrame(renderLoop);
@@ -238,7 +226,8 @@ const GlitchSynthesizer = () => {
   }, [videoSrc]);
 
 
-  // --- UI COMPONENTS ---
+  // --- STYLED COMPONENTS HELPERS ---
+  
   const Slider = ({ label, value, min, max, step, onChange, desc }) => (
     <div className="control-group">
       <div className="control-label-row">
@@ -259,6 +248,7 @@ const GlitchSynthesizer = () => {
 
   return (
     <div className="glitch-wrapper">
+      {/* --- INJECTED STYLES --- */}
       <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
       <style>{`
         :root {
@@ -281,7 +271,7 @@ const GlitchSynthesizer = () => {
             overflow: hidden;
         }
 
-        /* SIDEBAR STYLES */
+        /* SIDEBAR */
         .sidebar {
             width: 320px;
             min-width: 320px;
@@ -311,6 +301,7 @@ const GlitchSynthesizer = () => {
             overflow-y: auto;
             padding: 1.5rem;
         }
+        /* Custom Scrollbar */
         .sidebar-content::-webkit-scrollbar { width: 6px; }
         .sidebar-content::-webkit-scrollbar-track { background: #111; }
         .sidebar-content::-webkit-scrollbar-thumb { background: #333; }
@@ -326,6 +317,7 @@ const GlitchSynthesizer = () => {
         }
         .section-title:first-of-type { margin-top: 0; }
 
+        /* CONTROLS */
         .control-group {
             border-left: 2px solid var(--border);
             padding-left: 1rem;
@@ -363,6 +355,7 @@ const GlitchSynthesizer = () => {
             border-radius: 0;
             transition: transform 0.1s;
         }
+
         input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
@@ -371,6 +364,7 @@ const GlitchSynthesizer = () => {
         }
         input[type=range]:focus { outline: none; }
 
+        /* UPLOAD & BUTTONS */
         .file-upload-container {
             border: 1px dashed var(--border);
             padding: 1rem;
@@ -414,14 +408,8 @@ const GlitchSynthesizer = () => {
           background: white !important;
           color: black !important;
           border-color: white !important;
-          animation: pulse 2s infinite;
         }
 
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
 
         /* MAIN VIEW */
         .main-view {
@@ -437,7 +425,6 @@ const GlitchSynthesizer = () => {
             background-size: 30px 30px;
             background-position: 0 0, 15px 15px;
             overflow: hidden;
-            padding: 20px;
         }
         .crt-overlay {
             position: absolute;
@@ -466,12 +453,9 @@ const GlitchSynthesizer = () => {
             z-index: 10;
         }
 
-        /* CANVAS STYLING FOR VISUAL FIT */
         #glitch-canvas {
-            /* We don't limit width/height here by pixels, we let CSS scale the 4K canvas down */
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
+            max-width: 90%;
+            max-height: 90%;
             box-shadow: 0 0 50px rgba(0,0,0,0.8);
             border: 1px solid #222;
             background: #000;
@@ -485,6 +469,7 @@ const GlitchSynthesizer = () => {
         loop
         muted
         playsInline
+        className="hidden" // Tailwind utility still works if you have it, but standard CSS handles hidden if not
         style={{ display: 'none' }}
         crossOrigin="anonymous"
       />
@@ -492,7 +477,7 @@ const GlitchSynthesizer = () => {
       {/* --- SIDEBAR --- */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <h1 className="logo">Glitch Synth 4K</h1>
+          <h1 className="logo">Glitch Synthesizer</h1>
           <button onClick={resetParams} className="btn" style={{ padding: '5px', flex: '0 0 auto' }} title="Reset">
              <RotateCcw size={14} />
           </button>
@@ -533,13 +518,15 @@ const GlitchSynthesizer = () => {
               className={`btn ${isRecording ? "recording" : ""}`}
               onClick={isRecording ? stopRecording : startRecording}
             >
-              {isRecording ? "Recording..." : "REC 4K"}
+              {isRecording ? "Recording..." : "Record"}
             </button>
-            <button className="btn" onClick={stopRecording}>Stop & Save</button>
+            <button className="btn" onClick={stopRecording}>Stop & Download</button>
           </div>
+
 
           <div className="section-title">Signal Processing</div>
 
+          {/* NEW COLOR TOGGLE */}
           <div className="control-group" style={{ borderColor: 'transparent', paddingLeft: 0, borderLeft: 0 }}>
              <div className="btn-group" style={{ marginBottom: '0.5rem' }}>
                 <button 
@@ -558,13 +545,19 @@ const GlitchSynthesizer = () => {
           </div>
 
           <Slider label="Threshold" value={params.threshold} min={0} max={500} step={10} onChange={v => setParams(p => ({ ...p, threshold: v }))} desc="Contrast cutoff" />
+
           <Slider label="Gain (Brightness)" value={params.brightness} min={0} max={300} step={10} onChange={v => setParams(p => ({ ...p, brightness: v }))} desc=""/>
+
           <Slider label="Invert Chance" value={params.invertChance} min={0} max={1} step={0.05} onChange={v => setParams(p => ({ ...p, invertChance: v }))} desc=""/>
 
           <div className="section-title">Entropy / Glitch</div>
+
           <Slider label="Chaos Prob." value={params.chaos} min={0} max={1} step={0.01} onChange={v => setParams(p => ({ ...p, chaos: v }))} desc=""/>
+
           <Slider label="Slice Count" value={params.slices} min={0} max={50} step={1} onChange={v => setParams(p => ({ ...p, slices: v }))} desc="Height of glitch strips" />
+
           <Slider label="Displacement" value={params.displacement} min={0} max={300} step={5} onChange={v => setParams(p => ({ ...p, displacement: v }))} desc=""/>
+
           <Slider label="Zoom Jitter" value={params.zoomGlitch} min={0} max={2} step={0.1} onChange={v => setParams(p => ({ ...p, zoomGlitch: v }))} desc=""/>
 
           <div className="section-title">Temporal Feedback</div>
@@ -587,7 +580,7 @@ const GlitchSynthesizer = () => {
 
         <div className="meta-info">
             RENDERER: CANVAS 2D <br />
-            INTERNAL RES: {RENDER_WIDTH}x{RENDER_HEIGHT}
+            RES: {containerRef.current ? `${containerRef.current.clientWidth}x${containerRef.current.clientHeight}` : 'INIT'}
         </div>
 
         <canvas id="glitch-canvas" ref={canvasRef} />
